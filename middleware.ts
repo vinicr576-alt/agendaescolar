@@ -39,7 +39,8 @@ export async function middleware(request: NextRequest) {
         pai: '/pais',
         aluno: '/pais',
       }
-      const dest = roleRedirects[profile?.role ?? 'pai'] ?? '/pais'
+      const role = profile?.role ?? (user.app_metadata?.role as string) ?? 'pai'
+      const dest = roleRedirects[role] ?? '/pais'
       return NextResponse.redirect(new URL(dest, request.url))
     }
     return supabaseResponse
@@ -57,7 +58,7 @@ export async function middleware(request: NextRequest) {
     .eq('id', user.id)
     .single()
 
-  const role = profile?.role ?? 'pai'
+  const role = profile?.role ?? (user.app_metadata?.role as string) ?? 'pai'
 
   if (path.startsWith('/admin') && role !== 'admin') {
     return NextResponse.redirect(new URL(`/${role === 'professor' ? 'professor' : 'pais'}`, request.url))
