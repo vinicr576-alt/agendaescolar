@@ -24,47 +24,22 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const path = request.nextUrl.pathname
 
-  // Rotas públicas
-  if (path.startsWith('/auth') || path === '/') {
-    if (user && path.startsWith('/auth')) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      const roleRedirects: Record<string, string> = {
-        admin: '/admin',
-        professor: '/professor',
-        pai: '/pais',
-        aluno: '/pais',
-      }
-      const role = profile?.role ?? (user.app_metadata?.role as string) ?? 'pai'
-      const dest = roleRedirects[role] ?? '/pais'
-      return NextResponse.redirect(new URL(dest, request.url))
+  // Redirect logged-in users away from auth pages
+  if (path.startsWith('/auth')) {
+    if (user) {
+      return NextResponse.redirect(new URL('/', request.url))
     }
     return supabaseResponse
   }
 
-  // Protege rotas autenticadas
+  // Public root route - let page.tsx handle the role redirect
+  if (path === '/') {
+    return supabaseResponse
+  }
+
+  // Protect all other routes: require authentication
   if (!user) {
     return NextResponse.redirect(new URL('/auth/login', request.url))
-  }
-
-  // Verifica role vs rota
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  const role = profile?.role ?? (user.app_metadata?.role as string) ?? 'pai'
-
-  if (path.startsWith('/admin') && role !== 'admin') {
-    return NextResponse.redirect(new URL(`/${role === 'professor' ? 'professor' : 'pais'}`, request.url))
-  }
-  if (path.startsWith('/professor') && !['admin', 'professor'].includes(role)) {
-    return NextResponse.redirect(new URL('/pais', request.url))
   }
 
   return supabaseResponse
