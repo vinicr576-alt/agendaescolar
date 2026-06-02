@@ -19,16 +19,18 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const { data: profile } = await supabase
     .from('profiles')
     .select('nome, role, escola_id')
-    .eq('id', user.id)
+    .eq('id', user!.id)
     .single()
 
-  if (profile?.role !== 'admin') redirect('/pais')
+  // Fall back to app_metadata.role if DB query fails
+  const role = profile?.role ?? (user!.app_metadata as Record<string, string>)?.role ?? 'pai'
+  if (role !== 'admin') redirect('/pais')
 
-  const { data: escola } = await supabase
+  const { data: escola } = profile?.escola_id ? await supabase
     .from('escolas')
     .select('nome')
     .eq('id', profile.escola_id)
-    .single()
+    .single() : { data: null }
 
   async function logout() {
     'use server'
