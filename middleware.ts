@@ -24,22 +24,36 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const path = request.nextUrl.pathname
 
-  // Redirect logged-in users away from auth pages
-  if (path.startsWith('/auth')) {
-    if (user) {
-      return NextResponse.redirect(new URL('/', request.url))
-    }
-    return supabaseResponse
+  const roleRedirects: Record<string, string> = {
+    admin: '/admin',
+    professor: '/professor',
+    pai: '/pais',
+    aluno: '/pais',
   }
 
-  // Public root route - let page.tsx handle the role redirect
-  if (path === '/') {
+  // Redirect logged-in users away from auth pages or root
+  if (path.startsWith('/auth') || path === '/') {
+    if (user) {
+      const role = (user.app_metadata as Record<string, string>)?.role ?? 'pai'
+      const dest = roleRedirects[role] ?? '/pais'
+      return NextResponse.redirect(new URL(dest, request.url))
+    }
     return supabaseResponse
   }
 
   // Protect all other routes: require authentication
   if (!user) {
     return NextResponse.redirect(new URL('/auth/login', request.url))
+  }
+
+  // Role-based route protection
+  const role = (user.app_metadata as Record<string, string>)?.role ?? 'pai'
+
+  if (path.startsWith('/admin') && role !== 'admin') {
+    return NextResponse.redirect(new URL(roleRedirects[role] ?? '/pais', request.url))
+  }
+  if (path.startsWith('/professor') && !['admin', 'professor'].includes(role)) {
+    return NextResponse.redirect(new URL('/pais', request.url))
   }
 
   return supabaseResponse
