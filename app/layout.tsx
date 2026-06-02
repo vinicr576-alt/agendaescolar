@@ -25,12 +25,35 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt-BR">
       <head>
+        {/* Tailwind CSS via CDN */}
+        <script src="https://cdn.tailwindcss.com" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              tailwind.config = {
+                theme: {
+                  extend: {
+                    colors: {
+                      primary: {
+                        DEFAULT: '#2563EB',
+                        50: '#EFF6FF',
+                        100: '#DBEAFE',
+                        500: '#3B82F6',
+                        600: '#2563EB',
+                        700: '#1D4ED8',
+                      }
+                    }
+                  }
+                }
+              }
+            `,
+          }}
+        />
         {/* PWA iOS */}
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Agenda Escolar" />
-        {/* Splash screen iOS (opcional, gerar com ferramentas como pwa-asset-generator) */}
       </head>
       <body className="min-h-screen bg-gray-50 antialiased">
         {children}
