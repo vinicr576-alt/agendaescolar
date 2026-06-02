@@ -10,8 +10,10 @@ export default async function Home() {
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
-    .eq('id', user.id)
+    .eq('id', user!.id)
     .single()
+
+  const role = profile?.role ?? (user!.app_metadata as Record<string, string>)?.role ?? 'pai'
 
   const roleRedirects: Record<string, string> = {
     admin: '/admin',
@@ -20,5 +22,5 @@ export default async function Home() {
     aluno: '/pais',
   }
 
-  redirect(roleRedirects[profile?.role ?? 'pai'] ?? '/pais')
+  redirect(roleRedirects[role] ?? '/pais')
 }
