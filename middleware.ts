@@ -31,10 +31,17 @@ export async function middleware(request: NextRequest) {
     aluno: '/pais',
   }
 
+  function getRoleFromUser(u: typeof user) {
+    if (!u) return 'pai'
+    return (u.user_metadata as Record<string, string>)?.role
+      ?? (u.app_metadata as Record<string, string>)?.role
+      ?? 'pai'
+  }
+
   // Redirect logged-in users away from auth pages or root
   if (path.startsWith('/auth') || path === '/') {
     if (user) {
-      const role = (user.app_metadata as Record<string, string>)?.role ?? 'pai'
+      const role = getRoleFromUser(user)
       const dest = roleRedirects[role] ?? '/pais'
       return NextResponse.redirect(new URL(dest, request.url))
     }
@@ -47,7 +54,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Role-based route protection
-  const role = (user.app_metadata as Record<string, string>)?.role ?? 'pai'
+  const role = getRoleFromUser(user)
 
   if (path.startsWith('/admin') && role !== 'admin') {
     return NextResponse.redirect(new URL(roleRedirects[role] ?? '/pais', request.url))
