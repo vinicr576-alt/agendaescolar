@@ -22,8 +22,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     .eq('id', user!.id)
     .single()
 
-  // Fall back to app_metadata.role if DB query fails
-  const role = profile?.role ?? (user!.app_metadata as Record<string, string>)?.role ?? 'pai'
+  const role = profile?.role ?? (user!.user_metadata as Record<string, string>)?.role ?? 'pai'
   if (role !== 'admin') redirect('/pais')
 
   const { data: escola } = profile?.escola_id ? await supabase
@@ -40,47 +39,67 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen" style={{background:'#f1f5f9'}}>
       {/* Sidebar */}
-      <aside className="w-64 bg-white shadow-sm flex flex-col">
-        <div className="p-6 border-b">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-lg">
-              {escola?.nome?.[0] ?? 'E'}
+      <aside style={{width:'256px',background:'#0f172a',display:'flex',flexDirection:'column',flexShrink:0}}>
+        {/* Logo */}
+        <div style={{padding:'24px',borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
+          <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+            <div style={{width:'40px',height:'40px',background:'linear-gradient(135deg,#3b82f6,#6366f1)',borderRadius:'12px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'18px',fontWeight:'800',color:'white',flexShrink:0}}>
+              {(escola?.nome?.[0] ?? 'E').toUpperCase()}
             </div>
             <div>
-              <p className="font-semibold text-gray-800 text-sm leading-tight">{escola?.nome ?? 'Escola'}</p>
-              <p className="text-xs text-gray-400">Administrador</p>
+              <p style={{fontWeight:'700',color:'white',fontSize:'14px',lineHeight:'1.2',margin:0}}>{escola?.nome ?? 'Minha Escola'}</p>
+              <p style={{fontSize:'11px',color:'#64748b',margin:0,marginTop:'2px'}}>Administrador</p>
             </div>
           </div>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
+        {/* Nav */}
+        <nav style={{flex:1,padding:'16px 12px',display:'flex',flexDirection:'column',gap:'2px'}}>
           {navItems.map(item => (
             <Link
               key={item.href}
               href={item.href}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition"
+              style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',borderRadius:'8px',fontSize:'13px',color:'#94a3b8',textDecoration:'none',transition:'all 0.15s'}}
+              className="admin-nav-link"
             >
-              <span>{item.icon}</span>
-              {item.label}
+              <span style={{fontSize:'16px'}}>{item.icon}</span>
+              <span style={{fontWeight:'500'}}>{item.label}</span>
             </Link>
           ))}
         </nav>
 
-        <div className="p-4 border-t">
+        {/* Logout */}
+        <div style={{padding:'16px',borderTop:'1px solid rgba(255,255,255,0.08)'}}>
+          <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'12px'}}>
+            <div style={{width:'32px',height:'32px',background:'linear-gradient(135deg,#3b82f6,#6366f1)',borderRadius:'8px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'13px',fontWeight:'700',color:'white',flexShrink:0}}>
+              {(user?.email?.[0] ?? 'A').toUpperCase()}
+            </div>
+            <div style={{overflow:'hidden'}}>
+              <p style={{fontSize:'12px',color:'white',fontWeight:'600',margin:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{user?.email}</p>
+              <p style={{fontSize:'10px',color:'#64748b',margin:0}}>Admin</p>
+            </div>
+          </div>
           <form action={logout}>
-            <button className="w-full text-sm text-gray-500 hover:text-red-500 text-left px-3 py-2">
-              🚪 Sair
+            <button style={{width:'100%',fontSize:'12px',color:'#64748b',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'6px',padding:'7px 10px',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px'}}>
+              <span>🚪</span> Sair
             </button>
           </form>
         </div>
       </aside>
 
       {/* Main */}
-      <main className="flex-1 overflow-auto">
-        <div className="p-8">{children}</div>
+      <main style={{flex:1,overflow:'auto'}}>
+        <div style={{padding:'32px'}}>{children}</div>
       </main>
+
+      <style>{`
+        .admin-nav-link:hover {
+          background: rgba(255,255,255,0.06) !important;
+          color: white !important;
+        }
+      `}</style>
     </div>
   )
 }
