@@ -1,81 +1,55 @@
-🎒••••••••©'use client'
-
+'use client'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
-  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const router = useRouter()
 
-  async function handleLogin(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
-
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-
     if (error) {
-      setError('Email ou senha incorretos.')
+      setError('E-mail ou senha incorretos')
       setLoading(false)
-      return
+    } else {
+      router.push('/')
     }
-
-    router.push('/')
-    router.refresh()
   }
 
   return (
-    <form onSubmit={handleLogin} className="space-y-4">
-      <h2 className="text-xl font-semibold text-gray-800 mb-6">Entrar na conta</h2>
-
-      {error && (
-        <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg">{error}</div>
-      )}
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-        <input
-          type="email"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          required
-          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          placeholder="seu@email.com"
-        />
+    <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#0f172a 100%)',display:'flex',alignItems:'center',justifyContent:'center',padding:'24px'}}>
+      <div style={{width:'100%',maxWidth:'420px'}}>
+        <div style={{textAlign:'center',marginBottom:'40px'}}>
+          <div style={{width:'64px',height:'64px',borderRadius:'18px',background:'linear-gradient(135deg,#3b82f6,#6366f1)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'28px',margin:'0 auto 16px',boxShadow:'0 20px 40px rgba(99,102,241,0.4)'}}>🎒</div>
+          <h1 style={{color:'white',fontSize:'26px',fontWeight:'800',margin:0,letterSpacing:'-0.5px'}}>Agenda Escolar</h1>
+          <p style={{color:'rgba(255,255,255,0.5)',fontSize:'14px',marginTop:'6px'}}>Acesse sua conta</p>
+        </div>
+        <div style={{background:'rgba(255,255,255,0.05)',backdropFilter:'blur(20px)',borderRadius:'20px',padding:'36px',border:'1px solid rgba(255,255,255,0.1)',boxShadow:'0 25px 50px rgba(0,0,0,0.3)'}}>
+          <form onSubmit={handleSubmit}>
+            <div style={{marginBottom:'20px'}}>
+              <label style={{display:'block',color:'rgba(255,255,255,0.7)',fontSize:'13px',fontWeight:'500',marginBottom:'8px'}}>E-mail</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="seu@email.com" required style={{width:'100%',padding:'13px 16px',borderRadius:'12px',border:'1.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.07)',color:'white',fontSize:'15px',outline:'none',boxSizing:'border-box'}} />
+            </div>
+            <div style={{marginBottom:'28px'}}>
+              <label style={{display:'block',color:'rgba(255,255,255,0.7)',fontSize:'13px',fontWeight:'500',marginBottom:'8px'}}>Senha</label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required style={{width:'100%',padding:'13px 16px',borderRadius:'12px',border:'1.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.07)',color:'white',fontSize:'15px',outline:'none',boxSizing:'border-box'}} />
+            </div>
+            {error && (<div style={{background:'rgba(239,68,68,0.15)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:'10px',padding:'12px 16px',marginBottom:'20px',color:'#fca5a5',fontSize:'14px'}}>{error}</div>)}
+            <button type="submit" disabled={loading} style={{width:'100%',padding:'14px',borderRadius:'12px',background:'linear-gradient(135deg,#3b82f6,#6366f1)',color:'white',fontSize:'15px',fontWeight:'600',border:'none',cursor:loading?'not-allowed':'pointer',opacity:loading?0.7:1,boxShadow:'0 8px 20px rgba(99,102,241,0.4)'}}>
+              {loading ? 'Entrando...' : 'Entrar'}
+            </button>
+          </form>
+        </div>
+        <p style={{textAlign:'center',color:'rgba(255,255,255,0.3)',fontSize:'12px',marginTop:'24px'}}>© 2025 Agenda Escolar. Todos os direitos reservados.</p>
       </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Senha</label>
-        <input
-          type="password"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          required
-          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          placeholder="••••••••"
-        />
-      </div>
-
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-60 text-sm"
-      >
-        {loading ? 'Entrando...' : 'Entrar'}
-      </button>
-
-      <p className="text-center text-sm text-gray-500">
-        Responsável com código de convite?{' '}
-        <Link href="/auth/register" className="text-blue-600 hover:underline font-medium">
-          Criar conta
-        </Link>
-      </p>
-    </form>
+    </div>
   )
 }
