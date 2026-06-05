@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -48,7 +49,11 @@ export default function LoginPage() {
             </button>
           </form>
         </div>
-        <p style={{textAlign:'center',color:'rgba(255,255,255,0.3)',fontSize:'12px',marginTop:'24px'}}>© 2025 Agenda Escolar. Todos os direitos reservados.</p>
+        <p style={{textAlign:'center',color:'rgba(255,255,255,0.4)',fontSize:'13px',marginTop:'20px'}}>
+          Não tem conta?{' '}
+          <Link href="/auth/signup" style={{color:'rgba(255,255,255,0.7)',textDecoration:'none',fontWeight:'500'}}>Criar conta</Link>
+        </p>
+        <p style={{textAlign:'center',color:'rgba(255,255,255,0.3)',fontSize:'12px',marginTop:'12px'}}>© 2025 Agenda Escolar. Todos os direitos reservados.</p>
       </div>
     </div>
   )
