@@ -31,17 +31,20 @@ export async function middleware(request: NextRequest) {
     aluno: '/pais',
   }
 
-  function getRoleFromUser(u: typeof user) {
-    if (!u) return 'pai'
-    return (u.user_metadata as Record<string, string>)?.role
-      ?? (u.app_metadata as Record<string, string>)?.role
-      ?? 'pai'
+  async function getRole(): Promise<string> {
+    if (!user) return 'pai'
+    const { data } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    return data?.role ?? 'pai'
   }
 
   // Redirect logged-in users away from auth pages or root
   if (path.startsWith('/auth') || path === '/') {
     if (user) {
-      const role = getRoleFromUser(user)
+      const role = await getRole()
       const dest = roleRedirects[role] ?? '/pais'
       return NextResponse.redirect(new URL(dest, request.url))
     }
@@ -54,7 +57,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Role-based route protection
-  const role = getRoleFromUser(user)
+  const role = await getRole()
 
   if (path.startsWith('/admin') && role !== 'admin') {
     return NextResponse.redirect(new URL(roleRedirects[role] ?? '/pais', request.url))
@@ -67,5 +70,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 }
