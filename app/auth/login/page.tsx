@@ -49,7 +49,10 @@ export default function LoginPage() {
             </button>
           </form>
         </div>
-        <p style={{textAlign:'center',color:'rgba(255,255,255,0.4)',fontSize:'13px',marginTop:'20px'}}>
+        <p style={{textAlign:'center',color:'rgba(255,255,255,0.4)',fontSize:'13px',marginTop:'16px'}}>
+          <Link href="/auth/forgot-password" style={{color:'#818cf8',textDecoration:'none',fontWeight:'500'}}>Esqueci minha senha</Link>
+        </p>
+        <p style={{textAlign:'center',color:'rgba(255,255,255,0.4)',fontSize:'13px',marginTop:'8px'}}>
           Não tem conta?{' '}
           <Link href="/auth/signup" style={{color:'rgba(255,255,255,0.7)',textDecoration:'none',fontWeight:'500'}}>Criar conta</Link>
         </p>
