@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { CL_EDITIONS, CLClub, CLPlayer, CLEdition, Position } from './data'
 
 // ─── Formations ────────────────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ const FORMATIONS: FormationDef[] = [
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
-type GamePhase = 'setup' | 'drafting' | 'reviewing' | 'results'
+type GamePhase = 'setup' | 'drafting' | 'reviewing' | 'simulating' | 'results'
 type GameMode = 'classic' | 'memory'
 
 interface MatchResult {
@@ -95,12 +95,12 @@ interface GameState {
   phase: GamePhase
   mode: GameMode
   formation: FormationDef
-  currentSlot: number
   drawnClub: CLClub | null
   drawnEdition: CLEdition | null
   wildcards: number
   players: (CLPlayer | null)[]
   matchResults: MatchResult[]
+  revealedMatches: number
   isChampion: boolean
   advancedGroup: boolean
 }
@@ -187,12 +187,12 @@ function StatBar({ label, value, color }: { label: string; value: number; color:
 // ─── Player Card ────────────────────────────────────────────────────────────────
 
 function PlayerCard({
-  player, mode, onPick, selected
+  player, mode, onPick, disabled
 }: {
   player: CLPlayer
   mode: GameMode
   onPick?: () => void
-  selected?: boolean
+  disabled?: boolean
 }) {
   const posColor = player.position === 'GK' ? '#FACC15'
     : player.position === 'DEF' ? '#34D399'
@@ -203,10 +203,9 @@ function PlayerCard({
 
   return (
     <div
-      onClick={onPick}
-      className={`relative rounded-xl border transition-all duration-200 overflow-hidden cursor-pointer
-        ${selected ? 'border-yellow-400 shadow-lg shadow-yellow-400/20 scale-105' : 'border-gray-700 hover:border-gray-500 hover:scale-102'}
-        ${onPick ? 'hover:shadow-lg' : ''}
+      onClick={disabled ? undefined : onPick}
+      className={`relative rounded-xl border transition-all duration-200 overflow-hidden
+        ${disabled ? 'opacity-40 cursor-not-allowed' : onPick ? 'cursor-pointer border-gray-700 hover:border-gray-500 hover:scale-102 hover:shadow-lg' : 'cursor-default border-gray-700'}
         bg-gradient-to-b from-gray-800 to-gray-900`}
     >
       {player.isLegend && (
@@ -247,11 +246,10 @@ function PlayerCard({
 // ─── Formation Board ────────────────────────────────────────────────────────────
 
 function FormationBoard({
-  formation, players, currentSlot
+  formation, players
 }: {
   formation: FormationDef
   players: (CLPlayer | null)[]
-  currentSlot: number
 }) {
   return (
     <div className="relative w-full rounded-xl overflow-hidden" style={{ paddingBottom: '140%' }}>
@@ -267,7 +265,7 @@ function FormationBoard({
       {/* Players */}
       {formation.slots.map((slot, i) => {
         const player = players[i]
-        const isCurrent = i === currentSlot
+        const isEmpty = !player
         const posColor = slot.role === 'GK' ? '#FACC15'
           : slot.role === 'DEF' ? '#34D399'
           : slot.role === 'MID' ? '#60A5FA'
@@ -281,11 +279,11 @@ function FormationBoard({
           >
             <div
               className={`w-9 h-9 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all
-                ${isCurrent ? 'animate-pulse scale-110' : ''}
+                ${isEmpty ? 'animate-pulse' : ''}
                 ${player ? 'text-white' : 'text-gray-400'}`}
               style={{
-                borderColor: isCurrent ? '#FBBF24' : player ? posColor : '#6B7280',
-                backgroundColor: isCurrent ? '#FBBF2430' : player ? posColor + '40' : '#1F293780',
+                borderColor: player ? posColor : '#6B7280',
+                backgroundColor: player ? posColor + '40' : '#1F293780',
               }}
             >
               {player ? player.name.split(' ').pop()?.slice(0, 3).toUpperCase() : slot.label}
@@ -333,12 +331,12 @@ const initialState = (formation: FormationDef, mode: GameMode): GameState => ({
   phase: 'drafting',
   mode,
   formation,
-  currentSlot: 0,
   drawnClub: null,
   drawnEdition: null,
   wildcards: 3,
   players: new Array(formation.slots.length).fill(null),
   matchResults: [],
+  revealedMatches: 0,
   isChampion: false,
   advancedGroup: false,
 })
@@ -348,12 +346,12 @@ export default function ChampionsDraft() {
   const [setupFormation, setSetupFormation] = useState<FormationDef>(FORMATIONS[0])
   const [game, setGame] = useState<GameState | null>(null)
   const [usedClubIds, setUsedClubIds] = useState<string[]>([])
-  const [showingResults, setShowingResults] = useState(false)
+  const [showCurrentResult, setShowCurrentResult] = useState(false)
 
   const startGame = useCallback(() => {
     setGame(initialState(setupFormation, setupMode))
     setUsedClubIds([])
-    setShowingResults(false)
+    setShowCurrentResult(false)
   }, [setupFormation, setupMode])
 
   const rollDice = useCallback(() => {
@@ -377,14 +375,16 @@ export default function ChampionsDraft() {
     if (!game) return
     setGame(prev => {
       if (!prev) return prev
+      const slotIndex = prev.formation.slots.findIndex(
+        (slot, i) => slot.role === player.position && !prev.players[i]
+      )
+      if (slotIndex === -1) return prev
       const newPlayers = [...prev.players]
-      newPlayers[prev.currentSlot] = player
-      const nextSlot = prev.currentSlot + 1
-      const done = nextSlot >= prev.formation.slots.length
+      newPlayers[slotIndex] = player
+      const done = newPlayers.every(Boolean)
       return {
         ...prev,
         players: newPlayers,
-        currentSlot: nextSlot,
         drawnClub: null,
         drawnEdition: null,
         phase: done ? 'reviewing' : 'drafting',
@@ -397,17 +397,6 @@ export default function ChampionsDraft() {
     const myScore = calcTeamScore(game.players)
     const results: MatchResult[] = []
 
-    const opponents: { name: string; flag: string; diff: number }[] = [
-      { name: 'FC Barcelona 2009', flag: '🇪🇸', diff: -6 },
-      { name: 'Bayern Munich 2013', flag: '🇩🇪', diff: -2 },
-      { name: 'Manchester United 1999', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', diff: 0 },
-      { name: 'AC Milan 1989', flag: '🇮🇹', diff: 3 },
-      { name: 'Liverpool 2019', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', diff: 5 },
-      { name: 'Real Madrid 2014', flag: '🇪🇸', diff: 7 },
-      { name: 'Ajax 1973', flag: '🇳🇱', diff: 4 },
-    ]
-
-    // Shuffle a selection of real clubs for opponents
     const oppClubs = [...ALL_CLUBS].sort(() => Math.random() - 0.5).slice(0, 7)
     const rounds = ['Fase de Grupos', 'Fase de Grupos', 'Fase de Grupos', 'Oitavas', 'Quartas', 'Semifinal', 'Final']
 
@@ -434,9 +423,6 @@ export default function ChampionsDraft() {
         if (!userWon) { eliminated = true }
       }
 
-      const userGoals = match.homeGoals
-      const oppGoals  = match.awayGoals
-
       results.push({
         round: rounds[i],
         opponent: `${opp.club.name} (${opp.club.season})`,
@@ -444,7 +430,7 @@ export default function ChampionsDraft() {
         homeGoals: match.homeGoals,
         awayGoals: match.awayGoals,
         result: match.result,
-        userGoals,
+        userGoals: match.homeGoals,
         userResult: match.result,
       })
 
@@ -454,9 +440,48 @@ export default function ChampionsDraft() {
     const isChampion = results.length === 7 && (results[6].userResult === 'win' || results[6].userResult === 'win_pens')
     const advancedGroup = groupPoints >= 4
 
-    setGame(prev => prev ? { ...prev, phase: 'results', matchResults: results, isChampion, advancedGroup } : prev)
-    setShowingResults(true)
+    setShowCurrentResult(false)
+    setGame(prev => prev ? {
+      ...prev,
+      phase: 'simulating',
+      matchResults: results,
+      revealedMatches: 0,
+      isChampion,
+      advancedGroup,
+    } : prev)
   }, [game])
+
+  // Animated simulation — reveal one match every ~3.3s
+  useEffect(() => {
+    if (!game || game.phase !== 'simulating') return
+    const revealed = game.revealedMatches
+    const total = game.matchResults.length
+
+    if (revealed >= total) {
+      const t = setTimeout(() => {
+        setGame(prev => prev ? { ...prev, phase: 'results' } : prev)
+      }, 2000)
+      return () => clearTimeout(t)
+    }
+
+    setShowCurrentResult(false)
+    let advanceT: ReturnType<typeof setTimeout>
+    const revealT = setTimeout(() => {
+      setShowCurrentResult(true)
+      advanceT = setTimeout(() => {
+        setGame(prev =>
+          prev && prev.phase === 'simulating'
+            ? { ...prev, revealedMatches: prev.revealedMatches + 1 }
+            : prev
+        )
+      }, 1500)
+    }, 1800)
+
+    return () => {
+      clearTimeout(revealT)
+      clearTimeout(advanceT!)
+    }
+  }, [game?.phase, game?.revealedMatches])
 
   // ─ Render Setup ──────────────────────────────────────────────────────────────
 
@@ -554,6 +579,87 @@ export default function ChampionsDraft() {
     )
   }
 
+  // ─ Simulating Screen ──────────────────────────────────────────────────────────
+
+  if (game.phase === 'simulating') {
+    const currentIdx = game.revealedMatches
+    const total = game.matchResults.length
+    const currentMatch = currentIdx < total ? game.matchResults[currentIdx] : null
+    const done = currentIdx >= total
+
+    const getMatchColors = (m: MatchResult) => {
+      const win = m.userResult === 'win' || m.userResult === 'win_pens'
+      const draw = m.userResult === 'draw'
+      return win
+        ? { border: 'border-emerald-700', bg: 'bg-emerald-900/30', label: 'V', labelColor: 'text-emerald-400' }
+        : draw
+        ? { border: 'border-yellow-700', bg: 'bg-yellow-900/30', label: 'E', labelColor: 'text-yellow-400' }
+        : { border: 'border-red-700', bg: 'bg-red-900/30', label: 'D', labelColor: 'text-red-400' }
+    }
+
+    return (
+      <div className="min-h-screen text-white" style={{ background: 'linear-gradient(135deg, #050510 0%, #0a0a2e 50%, #050510 100%)' }}>
+        <div className="max-w-2xl mx-auto px-4 py-8">
+          <div className="text-center mb-6">
+            <div className="text-4xl mb-2">⚽</div>
+            <h2 className="text-2xl font-black text-white">Champions League</h2>
+            <p className="text-gray-400 text-sm mt-1">Simulando partidas...</p>
+          </div>
+
+          {/* Already revealed matches */}
+          <div className="space-y-2 mb-3">
+            {game.matchResults.slice(0, currentIdx).map((m, i) => (
+              <MatchRow key={i} match={m} />
+            ))}
+          </div>
+
+          {/* Currently playing match */}
+          {currentMatch && (
+            <div className={`rounded-xl border p-4 transition-all duration-300
+              ${showCurrentResult
+                ? getMatchColors(currentMatch).border + ' ' + getMatchColors(currentMatch).bg
+                : 'border-blue-600 bg-blue-900/20'
+              }`}
+            >
+              {!showCurrentResult ? (
+                <div className="flex items-center gap-3">
+                  <span className="text-red-400 text-xs font-bold animate-pulse shrink-0">🔴 AO VIVO</span>
+                  <span className="text-xs text-gray-400 w-24 shrink-0">{currentMatch.round}</span>
+                  <span className="text-sm text-white flex-1">
+                    vs {currentMatch.opponentFlag} {currentMatch.opponent}
+                  </span>
+                  <span className="text-lg font-mono font-black text-white animate-pulse">? — ?</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <span className={`text-sm font-bold w-6 shrink-0 ${getMatchColors(currentMatch).labelColor}`}>
+                    {getMatchColors(currentMatch).label}
+                  </span>
+                  <span className="text-xs text-gray-400 w-24 shrink-0">{currentMatch.round}</span>
+                  <span className="text-sm text-white flex-1">
+                    vs {currentMatch.opponentFlag} {currentMatch.opponent}
+                  </span>
+                  <span className="text-sm font-mono font-bold text-white">
+                    {currentMatch.homeGoals}–{currentMatch.awayGoals}
+                    {(currentMatch.userResult === 'win_pens' || currentMatch.userResult === 'loss_pens') && (
+                      <span className="text-xs text-gray-400 ml-1">(pen)</span>
+                    )}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {done && (
+            <div className="text-center mt-8 animate-pulse text-gray-400 text-sm">
+              Preparando resultados...
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   // ─ Results Screen ─────────────────────────────────────────────────────────────
 
   if (game.phase === 'results') {
@@ -618,7 +724,7 @@ export default function ChampionsDraft() {
 
           <div className="flex gap-3">
             <button
-              onClick={() => { setGame(null); setShowingResults(false) }}
+              onClick={() => setGame(null)}
               className="flex-1 py-4 rounded-xl font-bold text-white border border-gray-700 hover:border-gray-500 transition-all"
             >
               ← Menu Principal
@@ -686,12 +792,15 @@ export default function ChampionsDraft() {
 
   // ─ Draft Screen ───────────────────────────────────────────────────────────────
 
-  const currentSlotDef = game.formation.slots[game.currentSlot]
-  const neededRole: Position = currentSlotDef?.role ?? 'ATK'
-  const playersForPosition = game.drawnClub
-    ? game.drawnClub.players.filter(p => p.position === neededRole)
-    : []
-  const progress = game.currentSlot / game.formation.slots.length
+  const filledCount = game.players.filter(Boolean).length
+  const totalSlots = game.formation.slots.length
+  const progress = filledCount / totalSlots
+
+  // Which positions still have open slots
+  const openSlots = game.formation.slots.reduce((acc, slot, i) => {
+    if (!game.players[i]) acc[slot.role] = (acc[slot.role] || 0) + 1
+    return acc
+  }, {} as Partial<Record<Position, number>>)
 
   return (
     <div className="min-h-screen text-white" style={{ background: 'linear-gradient(135deg, #050510 0%, #0a0a2e 50%, #050510 100%)' }}>
@@ -719,8 +828,10 @@ export default function ChampionsDraft() {
         {/* Progress */}
         <div className="mb-6">
           <div className="flex justify-between text-xs text-gray-500 mb-1">
-            <span>Posição {game.currentSlot + 1}/{game.formation.slots.length}</span>
-            <span className="text-gray-400 font-semibold">{posLabel(neededRole)} — {currentSlotDef?.label}</span>
+            <span>{filledCount}/{totalSlots} jogadores escolhidos</span>
+            <span className="text-gray-400 font-semibold">
+              {Object.entries(openSlots).map(([pos, n]) => `${n} ${posLabel(pos as Position)}`).join(' · ')}
+            </span>
           </div>
           <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
             <div
@@ -737,7 +848,6 @@ export default function ChampionsDraft() {
             <FormationBoard
               formation={game.formation}
               players={game.players}
-              currentSlot={game.currentSlot}
             />
           </div>
 
@@ -748,8 +858,8 @@ export default function ChampionsDraft() {
               <div className="flex-1 flex flex-col items-center justify-center gap-6 py-12">
                 <div className="text-center">
                   <div className="text-5xl mb-3">🎲</div>
-                  <h2 className="text-xl font-bold text-white">Escolher {posLabel(neededRole)}</h2>
-                  <p className="text-gray-400 text-sm mt-1">Sorteie um clube para ver os jogadores disponíveis</p>
+                  <h2 className="text-xl font-bold text-white">Sortear Clube</h2>
+                  <p className="text-gray-400 text-sm mt-1">Sorteie um clube e escolha qualquer jogador disponível</p>
                 </div>
                 <button
                   onClick={rollDice}
@@ -760,7 +870,7 @@ export default function ChampionsDraft() {
                 </button>
               </div>
             ) : (
-              // Club drawn
+              // Club drawn — show all players grouped by position
               <div>
                 {/* Club Header */}
                 <div
@@ -784,29 +894,48 @@ export default function ChampionsDraft() {
                   </div>
                 </div>
 
-                {/* Players */}
-                {playersForPosition.length > 0 ? (
-                  <>
-                    <p className="text-sm text-gray-400 mb-3">
-                      Escolha seu <strong className="text-white">{posLabel(neededRole)}</strong>:
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-                      {playersForPosition.map(player => (
-                        <PlayerCard
-                          key={player.id}
-                          player={player}
-                          mode={game.mode}
-                          onPick={() => pickPlayer(player)}
-                        />
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-center py-6 bg-gray-800/50 rounded-xl border border-gray-700 mb-4">
-                    <p className="text-gray-400">Nenhum {posLabel(neededRole)} neste clube.</p>
-                    <p className="text-gray-500 text-sm">Use um curinga ou sorteie novamente.</p>
-                  </div>
-                )}
+                <p className="text-sm text-gray-400 mb-4">
+                  Escolha qualquer jogador — ele vai para a posição correspondente aberta no seu time:
+                </p>
+
+                {/* Players grouped by position */}
+                <div className="space-y-5 mb-4">
+                  {(['GK', 'DEF', 'MID', 'ATK'] as Position[]).map(pos => {
+                    const posPlayers = game.drawnClub!.players.filter(p => p.position === pos)
+                    if (!posPlayers.length) return null
+                    const slotsOpen = openSlots[pos] || 0
+                    const canPick = slotsOpen > 0
+                    return (
+                      <div key={pos} className={canPick ? '' : 'opacity-40'}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded uppercase
+                            ${pos === 'GK' ? 'bg-yellow-400/20 text-yellow-400 border border-yellow-400/30'
+                              : pos === 'DEF' ? 'bg-emerald-400/20 text-emerald-400 border border-emerald-400/30'
+                              : pos === 'MID' ? 'bg-blue-400/20 text-blue-400 border border-blue-400/30'
+                              : 'bg-red-400/20 text-red-400 border border-red-400/30'}`}
+                          >
+                            {posLabel(pos)}
+                          </span>
+                          {canPick
+                            ? <span className="text-xs text-gray-500">{slotsOpen} vaga{slotsOpen > 1 ? 's' : ''} disponível</span>
+                            : <span className="text-xs text-gray-600">✓ Posição preenchida</span>
+                          }
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                          {posPlayers.map(player => (
+                            <PlayerCard
+                              key={player.id}
+                              player={player}
+                              mode={game.mode}
+                              onPick={canPick ? () => pickPlayer(player) : undefined}
+                              disabled={!canPick}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
 
                 <div className="flex gap-3">
                   <button
