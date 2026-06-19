@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# TypeScript
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# environment variables
+.env
+.env.local
+.env.*.local
+
+# vercel
+.vercel
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
