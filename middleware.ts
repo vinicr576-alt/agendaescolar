@@ -41,6 +41,11 @@ export async function middleware(request: NextRequest) {
     return data?.role ?? 'pai'
   }
 
+  // Public routes — no auth required
+  if (path.startsWith('/champions')) {
+    return supabaseResponse
+  }
+
   // Redirect logged-in users away from auth pages or root
   if (path.startsWith('/auth') || path === '/') {
     if (user) {
